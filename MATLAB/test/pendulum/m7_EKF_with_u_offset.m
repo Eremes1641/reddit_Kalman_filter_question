@@ -12,8 +12,8 @@ plant_parm.g = 9.81; % gravity
 plant_parm.l = 0.1;  % length [m]
 
 % model parameter
-model_parm.a = 0.5;  % viscous friction [N-m / rad/s]
-model_parm.b = 5;    % gain [N-m/volt]
+model_parm.a = 0.4;  % viscous friction [N-m / rad/s]
+model_parm.b = 6;    % gain [N-m/volt]
 model_parm.g = 9.81; % gravity
 model_parm.l = 0.15; % length [m]
 
@@ -57,8 +57,8 @@ for i = 1:lenT
     y = pos_measured(i);              % measured pos
     u = u_input(i);                   % input
     h = plant_h(X_prior,model_parm);  % estimated pos
-    H = phpX(X_prior,model_parm);     % linearized measurement matrix
-    F = pfpX(X_prior,u,dt,model_parm); % linearized process matrix
+    H = phpX(X_prior,model_parm);     % measurement matrix
+    F = pfpX(X_prior,u,dt,model_parm); % process matrix
     
     % measurement update
     K = P_prior*H'/(H*P_prior*H'+R);
@@ -127,7 +127,9 @@ function F = pfpX(X,u,dt,parm)
     x1 = X(1);  % pos [rad]
 
     % pfpX
-    F = [1, dt, 0; -g/l*x1*dt, 1-a*dt, dt; 0, 0, 1];
+    F = [1, dt, 0;
+        -g/l*cos(x1)*dt, 1-a*dt, dt;
+        0, 0, 1];
 end
 
 function X = plant_f(X,u,dt,parm)

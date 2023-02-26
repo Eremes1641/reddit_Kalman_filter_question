@@ -55,8 +55,8 @@ for i = 1:lenT
     y = pos_measured(i);                % measured pos
     u = u_input(i);                     % input
     h = plant_h(X_prior,model_parm);    % estimated pos
-    H = phpX(X_prior,model_parm);       % linearized measurement matrix
-    F = pfpX(X_prior,u,dt,model_parm);  % linearized process matrix
+    H = phpX(X_prior,model_parm);       % measurement matrix
+    F = pfpX(X_prior,u,dt,model_parm);  % process matrix
     
     % measurement update
     K = P_prior*H'/(H*P_prior*H'+R);
@@ -117,8 +117,10 @@ function F = pfpX(X,u,dt,parm)
     x1 = X(1); % pos [rad]
 
     % pfpX
-    F = [1, dt; 
-        -g/l*x1*dt, 1-a*dt];
+%     F = [1, dt; 
+%         -g/l*x1*dt, 1-a*dt];
+    F = [1, dt;
+        -g/l*cos(x1)*dt, 1-a*dt];
 end
 
 function X = plant_f(X,u,dt,parm)
