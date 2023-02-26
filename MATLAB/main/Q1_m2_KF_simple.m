@@ -8,7 +8,7 @@ dt = 1/Fs;  % sampling period [sec]
 % simulation
 time = 0:dt:1.5;
 IC = [0 0]';
-equ = @(t,IC)equ_plant(t,IC);
+equ = @(t,IC)plant_DC_motor(t,IC);
 [t_sim,X_sim] = ode45(equ, time, IC);
 
 % extract data
