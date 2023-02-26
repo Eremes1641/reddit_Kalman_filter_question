@@ -1,14 +1,25 @@
 clc; clear; close all;
 
 %% declare
+% simulation
 Fs = 500;   % sampling freq [Hz]
 dt = 1/Fs;  % sampling period [sec]
+
+% plant
+plant_parm.a = 4;  % viscous friction [N-m / rad/s]
+plant_parm.b = 35; % gain [N-m/volt]
+plant_parm.d_Coulomb_coeff = 5;       % Coulomb friction coeff [volt]
+plant_parm.d_Coulomb_threshold = 3;   % Coulomb friction thrshould [rad/s]
+
+% model
+model_parm.a = 3;  % viscous friction [N-m / rad/s]
+model_parm.b = 30; % gain [N-m/volt]
 
 %% ODE
 % simulation
 time = 0:dt:1.5;
 IC = [0 0]';
-equ = @(t,IC)plant_DC_motor(t,IC);
+equ = @(t,IC)plant_DC_motor(t,IC,plant_parm);
 [t_sim,X_sim] = ode45(equ, time, IC);
 
 % extract data
@@ -32,8 +43,8 @@ acc_measured = awgn(acc_measured,10,'measured');
 
 %% kalman filter
 % model
-a = 3;  % viscous friction [N-m / rad/s]
-b = 30; % gain [N-m/volt]
+a = model_parm.a;
+b = model_parm.b;
 Aest = [0 1 0 0 0; 0 0 1 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0];
 Best = [0 0 0; 0 0 0; diag([1 1 1])];
 Cest = [1 0 0 0 0; 0 0 1 1 0; 0 a/b 1/b 0 1];
@@ -41,7 +52,10 @@ Pest = ss(Aest,Best,Cest,[]);
 Pest.StateName = {'pos', 'vel', 'acc', 'acc_offset', 'u_offset'};
 Pest.InputName = {'w_acc', 'w_acc_offset', 'w_u_offset'};
 Pest.OutputName = {'pos', 'acc', 'u'};
-Pest % display model
+Ob = obsv(Aest,Cest);
+unobsv = length(Aest) - rank(Ob);
+Pest    % display model
+unobsv  % check Observability. zero means all state are observable.
 Pest = c2d(Pest,dt);
 
 % kalman filter

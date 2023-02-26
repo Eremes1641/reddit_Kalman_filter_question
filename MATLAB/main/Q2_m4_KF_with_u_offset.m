@@ -1,14 +1,25 @@
 clc; clear; close all;
 
 %% declare
+% simulation
 Fs = 500;   % sampling freq [Hz]
 dt = 1/Fs;  % sampling period [sec]
+
+% plant
+plant_parm.a = 4;  % viscous friction [N-m / rad/s]
+plant_parm.b = 35; % gain [N-m/volt]
+plant_parm.d_Coulomb_coeff = 5;       % Coulomb friction coeff [volt]
+plant_parm.d_Coulomb_threshold = 3;   % Coulomb friction thrshould [rad/s]
+
+% model
+model_parm.a = 3;  % viscous friction [N-m / rad/s]
+model_parm.b = 30; % gain [N-m/volt]
 
 %% ODE
 % simulation
 time = 0:dt:1.5;
 IC = [0 0]';
-equ = @(t,IC)plant_DC_motor(t,IC);
+equ = @(t,IC)plant_DC_motor(t,IC,plant_parm);
 [t_sim,X_sim] = ode45(equ, time, IC);
 
 % extract data
@@ -16,7 +27,6 @@ simData = extract_sim_data(equ, t_sim, X_sim);
 t = simData.t;
 pos_true = simData.x1;
 vel_true = simData.x2;
-acc_true = simData.acc;
 d_Coulomb = simData.d;
 u_input = simData.u;
 lenT = length(t);
@@ -25,15 +35,11 @@ lenT = length(t);
 % discrete position measurement
 resolution = 1/100; % 100 CPR
 pos_measured = quantize_signal(pos_true,resolution);
-% add offset & noise into Acc
-acc_offset = 2*ones(length(acc_true),1);
-acc_measured = acc_true + acc_offset;
-acc_measured = awgn(acc_measured,10,'measured');
 
 %% kalman filter
 % model
-a = 3;  % viscous friction [N-m / rad/s]
-b = 30; % gain [N-m/volt]
+a = model_parm.a;
+b = model_parm.b;
 Aest = [0 1 0; 0 -a b; 0 0 0];
 Best = [0 1 0; 0 1 0; 0 0 1]';
 Cest = [1 0 0];

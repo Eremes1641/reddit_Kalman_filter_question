@@ -3,9 +3,9 @@ function [stateDt,simOut] = plant_pendulum(t,state,parm)
     %% declare
     % plant
     a = parm.a;  % viscous friction [N-m / rad/s]
-    b = parm.b;    % gain [N-m/volt]
-    g = parm.g;
-    l = parm.l; % length [m]
+    b = parm.b;  % gain [N-m/volt]
+    g = parm.g;  % gravity
+    l = parm.l;  % length [m]
 
     % u
     t0 = 0.1;
@@ -23,7 +23,7 @@ function [stateDt,simOut] = plant_pendulum(t,state,parm)
         u = 0;
     end
 
-    %% disturbance, Coulomb friction [volt]
+    %% disturbance
     d_gravity = g/l*sin(x1);
 
     %% plant

@@ -5,27 +5,27 @@ clc; clear; close all;
 Fs = 500;   % sampling freq [Hz]
 dt = 1/Fs;  % sampling period [sec]
 
-% plant parameter
-plant_parm.a = 0.5;  % viscous friction [N-m / rad/s]
-plant_parm.b = 5;    % gain [N-m/volt]
-plant_parm.g = 9.81; % gravity
-plant_parm.l = 0.1;  % length [m]
+% plant
+plant_parm.a = 4;  % viscous friction [N-m / rad/s]
+plant_parm.b = 35; % gain [N-m/volt]
+plant_parm.d_Coulomb_coeff = 5;       % Coulomb friction coeff [volt]
+plant_parm.d_Coulomb_threshold = 3;   % Coulomb friction thrshould [rad/s]
 
-% model parameter
-model_parm.a = 0.5;  % viscous friction [N-m / rad/s]
-model_parm.b = 5;    % gain [N-m/volt]
-model_parm.g = 9.81; % gravity
-model_parm.l = 0.15; % length [m]
+% model
+model_parm.a = 3;  % viscous friction [N-m / rad/s]
+model_parm.b = 30; % gain [N-m/volt]
+model_parm.d_Coulomb_coeff = 6;       % Coulomb friction coeff [volt]
+model_parm.d_Coulomb_threshold = 2;   % Coulomb friction thrshould [rad/s]
 
 % EKF parameter
-Q = diag([1E3 1E7]); % u weighting, general disturbance weighting
+Q = diag([1E3 1E3]); % u weighting, general disturbance weighting
 R = 1E3;             % pos weighting
 
 %% ODE
 % simulation
 time = 0:dt:1.5;
 IC = [0 0]';
-equ = @(t,IC)plant_pendulum(t,IC,plant_parm);
+equ = @(t,IC)plant_DC_motor(t,IC,plant_parm);
 [t_sim,X_sim] = ode45(equ, time, IC);
 
 % extract data
@@ -35,7 +35,7 @@ pos_true = simData.x1;
 vel_true = simData.x2;
 u_input = simData.u;
 lenT = length(t);
-% d_true = simData.d;
+% d = simData.d;
 d_true = get_d_true(t_sim,X_sim,u_input,plant_parm, model_parm);
 
 %% measurement data
@@ -94,8 +94,7 @@ title(ax(3,1),'u')
 title(ax(3,2),'general disturbance')
 ylabel(ax(1,1),'rad')
 ylabel(ax(2,1),'rad/s')
-ylabel(ax(3,1),'volt')
-ylabel(ax(3,2),'N-m')
+ylabel(ax(3,:),'volt')
 xlabel(ax,'time (sec)')
 legend(ax(1,1),'measured')
 legend(ax(2,1),{'true', 'estimated'})
@@ -117,35 +116,40 @@ function F = pfpX(X,u,dt,parm)
     %         p(f2)px1, p(f2)px2, p(f2)px3;
     %         p(f3)px1, p(f3)px2, p(f3)px3]
     % f1 = x1 + x2*dt
-    % f2 = x2 + (-a*x2 + b*u - g/l*sin(x1) + x3)*dt
+    % f2 = x2 + (-a*x2 + b*u - b*d_Coulomb + b*x3)*dt
     % f3 = x3
+    % d_Coulomb = d_Coulomb_coeff*tanh(x2/d_Coulomb_threshold);
+    % tanh(x/a)' = sech^2(x/a)/a
 
     % substitute
-    a = parm.a; % viscous friction [N-m / rad/s]
-    g = parm.g; % gravity
-    l = parm.l; % length [m]
-    x1 = X(1);  % pos [rad]
+    a = parm.a;  % viscous friction [N-m / rad/s]
+    b = parm.b;  % gain [N-m/volt]
+    d_Coulomb_coeff = parm.d_Coulomb_coeff;         % Coulomb friction coeff [volt]
+    d_Coulomb_threshold = parm.d_Coulomb_threshold; % Coulomb friction thrshould [rad/s]
+    x2 = X(2);   % vel [rad/s]
 
     % pfpX
-    F = [1, dt, 0; -g/l*x1*dt, 1-a*dt, dt; 0, 0, 1];
+    F = [1, dt, 0; 
+         0, 1-a*dt-b*dt*d_Coulomb_coeff/d_Coulomb_threshold*sech(x2/d_Coulomb_threshold)^2, b*dt; 
+         0, 0, 1];
 end
 
 function X = plant_f(X,u,dt,parm)
     % substitute
-    a = parm.a; % viscous friction [N-m / rad/s]
-    b = parm.b; % gain [N-m/volt]
-    g = parm.g; % gravity
-    l = parm.l; % length [m]
+    a = parm.a;  % viscous friction [N-m / rad/s]
+    b = parm.b;  % gain [N-m/volt]
+    d_Coulomb_coeff = parm.d_Coulomb_coeff;         % Coulomb friction coeff [volt]
+    d_Coulomb_threshold = parm.d_Coulomb_threshold; % Coulomb friction thrshould [rad/s]
     x1 = X(1);  % pos [rad]
     x2 = X(2);  % vel [rad/s]
     x3 = X(3);  % disturbance [volt]
     
     % disturbance
-    d_gravity = g/l*sin(x1);
+    d_Coulomb = d_Coulomb_coeff*tanh(x2/d_Coulomb_threshold);
     
     % plant & integral (backward Eulaer method)
     x1_next = x1 + x2*dt;
-    x2_next = x2 + (-a*x2 + b*u - d_gravity + x3)*dt;
+    x2_next = x2 + (-a*x2 + b*u - b*d_Coulomb + b*x3)*dt;
     x3_next = x3;
     X = [x1_next; x2_next; x3_next];
 end
@@ -155,22 +159,24 @@ function y = plant_h(X,parm)
 end
 
 function d = get_d_true(t,X,u_input,plant_parm, model_parm)
-    ap = plant_parm.a;
-    bp = plant_parm.b;
-    gp = plant_parm.g;
-    lp = plant_parm.l;
+    ap = plant_parm.a;  % viscous friction [N-m / rad/s]
+    bp = plant_parm.b;  % gain [N-m/volt]
+    dp_Coulomb_coeff = plant_parm.d_Coulomb_coeff;         % Coulomb friction coeff [volt]
+    dp_Coulomb_threshold = plant_parm.d_Coulomb_threshold; % Coulomb friction thrshould [rad/s]
 
-    am = model_parm.a;
-    bm = model_parm.b;
-    gm = model_parm.g;
-    lm = model_parm.l;
-    
+    am = model_parm.a;  % viscous friction [N-m / rad/s]
+    bm = model_parm.b;  % gain [N-m/volt]
+    dm_Coulomb_coeff = model_parm.d_Coulomb_coeff;         % Coulomb friction coeff [volt]
+    dm_Coulomb_threshold = model_parm.d_Coulomb_threshold; % Coulomb friction thrshould [rad/s]
+
     d = zeros(length(t),1);
     for i = 1:length(t)
         x1 = X(i,1);
         x2 = X(i,2);
         u = u_input(i);
-        d(i) = -(ap-am)*x2 + (bp-bm)*u - ( gp/lp*sin(x1) - gm/lm*sin(x1));
+        dp_Coulomb = dp_Coulomb_coeff*tanh(x2/dp_Coulomb_threshold);
+        dm_Coulomb = dm_Coulomb_coeff*tanh(x2/dm_Coulomb_threshold);
+        d(i) = ( -(ap-am)*x2 + (bp-bm)*u - ( bp*dp_Coulomb - bm*dm_Coulomb ) )/bp;
     end
 end
 

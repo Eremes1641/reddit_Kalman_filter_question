@@ -88,7 +88,7 @@ title(ax(2),'vel')
 title(ax(3),'u')
 ylabel(ax(1),'rad')
 ylabel(ax(2),'rad/s')
-ylabel(ax(3,:),'volt')
+ylabel(ax(3),'volt')
 xlabel(ax,'time (sec)')
 legend(ax(1),'measured')
 legend(ax(2),{'true', 'estimated'})
@@ -117,7 +117,8 @@ function F = pfpX(X,u,dt,parm)
     x1 = X(1); % pos [rad]
 
     % pfpX
-    F = [1, dt; -g/l*x1*dt, 1-a*dt];
+    F = [1, dt; 
+        -g/l*x1*dt, 1-a*dt];
 end
 
 function X = plant_f(X,u,dt,parm)

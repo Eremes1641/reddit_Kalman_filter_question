@@ -1,9 +1,11 @@
-function [stateDt,simOut] = plant_DC_motor(t,state)
+function [stateDt,simOut] = plant_DC_motor(t,state,parm)
     %% this plant is a DC motor with coulomb fricion drived by voltage
     %% declare
     % plant
-    a = 4;  % viscous friction [N-m / rad/s]
-    b = 35; % gain [N-m/volt]
+    a = parm.a;  % viscous friction [N-m / rad/s]
+    b = parm.b;  % gain [N-m/volt]
+    d_Coulomb_coeff = parm.d_Coulomb_coeff;         % Coulomb friction coeff [volt]
+    d_Coulomb_threshold = parm.d_Coulomb_threshold; % Coulomb friction thrshould [rad/s]
 
     % u
     t0 = 0.1;
@@ -22,7 +24,7 @@ function [stateDt,simOut] = plant_DC_motor(t,state)
     end
 
     %% disturbance, Coulomb friction [volt]
-    d_Coulomb = 5*tanh(x2/3);
+    d_Coulomb = d_Coulomb_coeff*tanh(x2/d_Coulomb_threshold);
 
     %% plant
     x1Dt = x2;

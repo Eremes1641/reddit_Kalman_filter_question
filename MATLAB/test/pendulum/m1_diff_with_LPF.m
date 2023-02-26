@@ -1,14 +1,21 @@
 clc; clear; close all;
 
 %% declare
+% simulation
 Fs = 500;   % sampling freq [Hz]
 dt = 1/Fs;  % sampling period [sec]
+
+% plant parameter
+plant_parm.a = 0.5;  % viscous friction [N-m / rad/s]
+plant_parm.b = 5;    % gain [N-m/volt]
+plant_parm.g = 9.81; % gravity
+plant_parm.l = 0.1;  % length [m]
 
 %% ODE
 % simulation
 time = 0:dt:1.5;
 IC = [0 0]';
-equ = @(t,IC)plant_pendulum(t,IC);
+equ = @(t,IC)plant_pendulum(t,IC,plant_parm);
 [t_sim,X_sim] = ode45(equ, time, IC);
 
 % extract data
